@@ -65,7 +65,6 @@ class _MyHomePageState extends State<MyHomePage> {
   AlgorandNet net = AlgorandNet.testnet;
 
   bodyState state = bodyState.empty;
-  bool connected = false;
   Widget? QR;
 
   SessionStatus? session;
@@ -146,6 +145,25 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: session == null ? ElevatedButton(onPressed: connect, child: const Text('connect')) : Text(session!.accounts.first),
       ),
+      bottomNavigationBar: BottomAppBar(
+          child: Row(
+        children: [
+          ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  net = AlgorandNet.mainnet;
+                });
+              },
+              child: Text('mainnet${net == AlgorandNet.mainnet ? ' - chosen' : ''}')),
+          ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  net = AlgorandNet.testnet;
+                });
+              },
+              child: Text('testnet${net == AlgorandNet.testnet ? ' - chosen' : ''}'))
+        ],
+      )),
       drawer: Drawer(
         child: ListView(
           children: [
@@ -182,19 +200,19 @@ class _MyHomePageState extends State<MyHomePage> {
                 Navigator.pop(context);
               },
             ),
-            // ListTile(
-            //   title: const Text('logout'),
-            //   onTap: () {
-            //     if (session != null) {
-            //       setState(() {
-            //         connector.close();
-            //         session = null;
-            //         state = bodyState.empty;
-            //       });
-            //     }
-            //     Navigator.pop(context);
-            //   },
-            // )
+            ListTile(
+              title: const Text('logout'),
+              onTap: () {
+                if (session != null) {
+                  setState(() {
+                    connector.close();
+                    session = null;
+                    state = bodyState.empty;
+                  });
+                }
+                Navigator.pop(context);
+              },
+            )
           ],
         ),
       ),
@@ -459,7 +477,7 @@ class _WithdrawState extends State<Withdraw> {
 
   void findTxns() async {
     final lib = AlgorandLib.lib[net]!;
-    final searchResponse = await lib.indexer().transactions().whereNotePrefix('$NOTE_PREFIX${session.accounts.first}').search();
+    final searchResponse = await lib.indexer().transactions().afterMinRound(22715559).whereNotePrefix('$NOTE_PREFIX${session.accounts.first}').search();
     txns = searchResponse.transactions;
     print('findTxns=${txns?.length}');
   }
