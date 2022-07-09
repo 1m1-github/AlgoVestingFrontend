@@ -16,6 +16,7 @@ inputs: cancancel, # coins, asa id, end, beneficiary
 ### opt-into ASA (optional, i.e. needed once)
 
 ### withdraw
+inputs: sc 
 
 ## Update
 inputs: end, # coins

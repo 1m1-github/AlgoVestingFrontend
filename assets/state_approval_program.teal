@@ -1,0 +1,163 @@
+	#pragma version 5
+	txn OnCompletion
+	int 0
+	==
+	bnz label1
+	txn OnCompletion
+	int 1
+	==
+	bnz label2
+	txn OnCompletion
+	int 2
+	==
+	bnz label3
+	txn OnCompletion
+	int 4
+	==
+	bnz label4
+	txn OnCompletion
+	pushint 5
+	==
+	bnz label3
+	b label5
+label1:
+	txna ApplicationArgs 0
+	pushbytes 0x696e6974 
+	==
+	bnz label6
+	txna ApplicationArgs 0
+	pushbytes 0x7769746864726177 
+	==
+	bnz label7
+	txna ApplicationArgs 0
+	pushbytes 0x757064617465 
+	==
+	bnz label8
+	b label5
+label6:
+	int 0
+	byte base64 Q0FOQ0FOQ0VM
+	app_global_get_ex
+	bnz label5
+	pop
+	txn Sender
+	global CreatorAddress
+	==
+	assert
+	txn GroupIndex
+	int 0
+	==
+	global GroupSize
+	int 2
+	==
+	&&
+	assert
+	int 1
+	gtxns TypeEnum
+	int 4
+	==
+	int 1
+	gtxns XferAsset
+	txna Assets 0
+	==
+	&&
+	assert
+	txna ApplicationArgs 3
+	btoi
+	global LatestTimestamp
+	>
+	bz label5
+	byte base64 Q0FOQ0FOQ0VM
+	txna ApplicationArgs 1
+	btoi
+	app_global_put
+	byte base64 U1RBUlQ=
+	txna ApplicationArgs 2
+	btoi
+	app_global_put
+	byte base64 RU5E
+	txna ApplicationArgs 3
+	btoi
+	app_global_put
+	byte base64 QkVORUZJQ0lBUlk=
+	txna Accounts 1
+	app_global_put
+	itxn_begin
+	int 4
+	itxn_field TypeEnum
+	global CurrentApplicationAddress
+	itxn_field AssetReceiver
+	txna Assets 0
+	itxn_field XferAsset
+	int 0
+	itxn_field AssetAmount
+	itxn_submit
+	b label9
+label7:
+	global GroupSize
+	int 1
+	==
+	assert
+	byte base64 QkVORUZJQ0lBUlk=
+	app_global_get
+	store 0
+	byte base64 U1RBUlQ=
+	app_global_get
+	store 10
+	byte base64 RU5E
+	app_global_get
+	store 11
+	txn Sender
+	load 0
+	==
+	assert
+	global LatestTimestamp
+	load 10
+	-
+	intc 4 
+	*
+	load 11
+	load 10
+	-
+	/
+	global CurrentApplicationAddress
+	txna Assets 0
+	asset_holding_get AssetBalance
+	bz label5
+	*
+	intc 4 
+	/
+	store 1
+	itxn_begin
+	int 4
+	itxn_field TypeEnum
+	load 0
+	itxn_field AssetReceiver
+	txna Assets 0
+	itxn_field XferAsset
+	load 1
+	itxn_field AssetAmount
+	itxn_submit
+	b label9
+label8:
+	b label5
+label4:
+	global GroupSize
+	int 1
+	==
+	global CreatorAddress
+	txn Sender
+	==
+	&&
+	bnz label9
+	b label5
+label3:
+	b label5
+label2:
+	b label9
+label5:
+	int 0
+	return
+label9:
+	int 1
+	return
