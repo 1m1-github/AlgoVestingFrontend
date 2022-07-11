@@ -3,6 +3,7 @@
 
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
 import 'package:algorand_dart/algorand_dart.dart';
@@ -62,7 +63,7 @@ enum bodyState { qr, empty, create, withdraw, update, cancel }
 class _MyHomePageState extends State<MyHomePage> {
   AlgorandNet net = AlgorandNet.testnet;
 
-  bodyState state = bodyState.empty;
+  bodyState state = bodyState.create; // DEBUG
   Widget? QR;
 
   SessionStatus? session = SessionStatus(chainId: 0, accounts: ['2I2IXTP67KSNJ5FQXHUJP5WZBX2JTFYEBVTBYFF3UUJ3SQKXSZ3QHZNNPY']);
@@ -83,8 +84,20 @@ class _MyHomePageState extends State<MyHomePage> {
     return bridges[ix];
   }
 
-  late WalletConnect connector;
-  late AlgorandWalletConnectProvider provider;
+  late WalletConnect connector = WalletConnect(
+    // bridge: 'https://bridge.walletconnect.org',
+    bridge: 'https://wallet-connect-a.perawallet.app',
+    // bridge: bridge,
+    clientMeta: const PeerMeta(
+      name: 'AlgoVesting',
+      description: 'pro-rata coins',
+      url: 'https://github.com/1m1-github/AlgoVesting',
+      icons: [
+        'https://firebasestorage.googleapis.com/v0/b/algovesting-1m1.appspot.com/o/AlgoVesting%20logo.png?alt=media&token=b07d9f01-56a3-4a69-9703-6e15b6713af2'
+      ],
+    ),
+  );
+  late AlgorandWalletConnectProvider provider = AlgorandWalletConnectProvider(connector);
 
   Future init() async {
     final bridge = await getWCBridge();
@@ -163,6 +176,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final ButtonStyle style = ElevatedButton.styleFrom(primary: Colors.amber);
     print('build QR=$QR');
     return Scaffold(
       appBar: AppBar(
@@ -170,15 +184,11 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       bottomNavigationBar: BottomAppBar(
           child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          ElevatedButton(style: style, onPressed: null, child: Text('mainnet (not yet)${net == AlgorandNet.mainnet ? ' - chosen' : ''}')),
           ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  net = AlgorandNet.mainnet;
-                });
-              },
-              child: Text('mainnet${net == AlgorandNet.mainnet ? ' - chosen' : ''}')),
-          ElevatedButton(
+              style: style,
               onPressed: () {
                 setState(() {
                   net = AlgorandNet.testnet;
@@ -303,7 +313,7 @@ class _CreateState extends State<Create> {
   AlgorandWalletConnectProvider provider;
   AlgorandNet net;
   SessionStatus session;
-  List<int> assets; // DEBUG
+  List<int> assets;
 
   // bool canCancel = false;
   // bool done = false;
@@ -384,43 +394,41 @@ class _CreateState extends State<Create> {
     sendTxn(lib, signedTxnsBytes, () {});
   }
 
+  int amount = 0;
+  int end = 0;
+  int? asaId;
+  String beneficiary = '';
+  bool cancancel = false;
+
   @override
   Widget build(BuildContext context) {
-    int amount = 0;
-    int end = 0;
-    int asaId = assets.first;
-    String beneficiary = '';
-    bool cancancel = false;
-
     return ItemCard(
-      topTitleKey: 'dApp',
-      topTitleValue: 'dAppAddr',
-      topSubTitleKey: 'beneficiary',
-      topSubTitleValue: 'note',
-      // amountController: _amountController,
+      beneficiaryOnChanged: (String x) {},
       amountOnChanged: (String x) {
         amount = int.parse(x);
+        setState(() {});
       },
-      // endController: _endController,
       endOnChanged: (String x) {
-        print('endOnChanged x=$x');
         end = int.parse(x);
         setState(() {});
       },
-      asas: assets,
+      asas: [1, 2], //assets,
       onASAChanged: (int? x) {
-        asaId = x ?? 0;
+        print('onASAChanged x=$x asaId=$asaId');
+        asaId = x;
+        print('onASAChanged x=$x asaId=$asaId');
+        setState(() {});
       },
       canCancelOnChanged: (x) {
+        print('canCancelOnChanged x=$x');
         cancancel = x;
+        setState(() {});
       },
       canCancel: cancancel,
-      asaId: asaId,
+      asaId: asaId, //asaId,
       amount: amount,
       end: end,
-      onPressed: () {
-        return create(beneficiary, end, asaId, amount, cancancel);
-      },
+      onPressed: () => create(beneficiary, end, asaId!, amount, cancancel),
       action: 'create',
     );
 
@@ -703,7 +711,7 @@ class _UpdateState extends State<Update> {
         final start = data[2];
         final end = data[3];
 
-        final rate = calcRate(start, end, amount);
+        final rate = calcRate(start, end, amount) ?? 0;
 
         int newAmount = 0;
         int newEnd = 0;
@@ -728,7 +736,7 @@ class _UpdateState extends State<Update> {
           start: start,
           end: end,
           onPressed: () {
-            final newRate = calcRate(start, newEnd, amount + newAmount);
+            final newRate = calcRate(start, newEnd, amount + newAmount) ?? 0;
             if (newRate < rate) return null;
             return update(dAppAddr, dAppId, asaId, newEnd, newAmount);
           },
@@ -867,16 +875,14 @@ class _CancelState extends State<Cancel> {
 
 class ItemCard extends StatelessWidget {
   ItemCard({
-    this.topTitleKey = '',
-    this.topTitleValue = '',
-    this.topSubTitleKey = '',
-    this.topSubTitleValue = '',
-    // this.amountController,
+    this.topTitleKey,
+    this.topTitleValue,
+    this.topSubTitleKey,
+    this.topSubTitleValue,
     this.amountOnChanged,
     this.beneficiaryOnChanged,
     this.canCancelOnChanged,
     this.canCancel = false,
-    // this.endController,
     this.endOnChanged,
     this.asas,
     this.onASAChanged,
@@ -889,13 +895,10 @@ class ItemCard extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  final String topTitleKey;
-  final String topTitleValue;
-  final String topSubTitleKey;
-  final String topSubTitleValue;
-
-  // final TextEditingController? amountController;
-  // final TextEditingController? endController;
+  final String? topTitleKey;
+  final String? topTitleValue;
+  final String? topSubTitleKey;
+  final String? topSubTitleValue;
 
   final List<int>? asas;
   final Function(int?)? onASAChanged;
@@ -909,68 +912,130 @@ class ItemCard extends StatelessWidget {
 
   final Function()? onPressed;
 
-  final int asaId;
+  final int? asaId;
   final int amount;
   final String action;
   final int? start;
-  int end;
+  final int end;
 
   @override
   Widget build(BuildContext context) {
+    print('asaId=$asaId');
+
     return Card(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          ListTile(
-            title: Text('$topTitleKey $topTitleValue'),
-            subtitle: Text('$topSubTitleKey $topSubTitleValue'),
+          ElevatedButton(
+            onPressed: onPressed,
+            child: Text(
+              action,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 30),
+            ),
           ),
+          (topTitleKey != null || topTitleValue != null || topSubTitleKey != null || topSubTitleValue != null)
+              ? ListTile(
+                  title: Text('$topTitleKey $topTitleValue'),
+                  subtitle: Text('$topSubTitleKey $topSubTitleValue'),
+                )
+              : Container(),
           amountOnChanged != null
               ? TextField(
-                  // controller: amountController,
                   onChanged: amountOnChanged,
-                  decoration: const InputDecoration(label: Text('# coins')),
+                  decoration: const InputDecoration(
+                      label: Text('# coins'),
+                      helperText: 'how many coins do you want to lock?',
+                      icon: Icon(Icons.monetization_on),
+                      border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 )
               : Container(),
           endOnChanged != null
               ? TextField(
-                  // controller: endController,
                   onChanged: endOnChanged,
-                  decoration: const InputDecoration(label: Text('END timestamp')),
+                  decoration: const InputDecoration(
+                      label: Text('END timestamp'),
+                      helperText: 'when all unlocked? [epoch=secs since 1970]',
+                      icon: Icon(Icons.schedule),
+                      border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 )
               : Container(),
           beneficiaryOnChanged != null
               ? TextField(
-                  // controller: endController,
                   onChanged: beneficiaryOnChanged,
-                  decoration: const InputDecoration(label: Text('beneficiary addr')),
+                  decoration: const InputDecoration(
+                      label: Text('beneficiary addr'), helperText: 'Algorand account of beneficiary', icon: Icon(Icons.person), border: OutlineInputBorder()),
                 )
               : Container(),
           canCancelOnChanged != null
-              ? Row(children: [
-                  const Text('CanCancel'),
-                  Checkbox(
-                    value: canCancel,
-                    onChanged: (x) => canCancelOnChanged,
-                  )
-                ])
+              ?
+              // ? Row(children: [
+              CheckboxListTile(
+                  // tileColor: Colors.grey,
+                  subtitle: Text('can the creator ever remove the coins?'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    side: BorderSide(width: 1, color: Colors.grey),
+                  ),
+                  side: BorderSide(width: 1),
+                  // checkboxShape: OutlinedBorder(side: BorderSide.),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 0),
+                  title: const Text('CanCancel'),
+                  value: canCancel,
+                  onChanged: (x) => canCancelOnChanged!(x!),
+                )
+              // ])
               : Container(),
           asas != null
               ? Row(children: [
-                  const Text('ASA'),
-                  DropdownButton<int>(
-                    items: asas!.map((int e) => DropdownMenuItem<int>(value: e, child: Text(e.toString()))).toList(),
-                    onChanged: onASAChanged,
-                    value: asaId,
+                  // const Text('ASA'),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: Colors.grey, style: BorderStyle.solid, width: 0.80),
+                    ),
+                    child: DropdownButton<int>(
+                      // borderRadius: BorderRadius.circular(2),
+                      // elevation: 10,
+                      // dropdownColor: Colors.grey,
+                      hint: Text('which coin to lock? [ASA id]'),
+                      icon: Icon(Icons.keyboard_arrow_down),
+                      alignment: AlignmentDirectional.center,
+                      // iconSize: 100,
+                      // style: TextStyle(leadingDistribution: TextLeadingDistribution.even, ),
+                      // side
+                      // disabledHint: null,
+                      items: asas!
+                          .map((int e) => DropdownMenuItem<int>(
+                              alignment: AlignmentDirectional.center,
+                              value: e,
+                              child: Text(
+                                e.toString(),
+                                textAlign: TextAlign.center,
+                              )))
+                          .toList(),
+                      onChanged: onASAChanged,
+                      value: asaId,
+                    ),
                   ),
                 ])
               : Container(),
-          Text('$amount locked until $end'),
-          Row(
-            children: [
-              Text('rate ${calcRate(start, end, amount)} [$asaId/sec]'),
-              ElevatedButton(onPressed: onPressed, child: Text(action)),
-            ],
-          )
+          Container(
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey,
+            ),
+            child: Text(
+              '$amount locked until $end\nwithdrawal rate = ${calcRate(start, end, amount).toStringAsPrecision(2)} [$asaId/sec]',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 20),
+            ),
+          ),
         ],
       ),
     );
@@ -1000,6 +1065,7 @@ num calcRate(int? _start, int? end, int? amount) {
     final now = DateTime.now();
     start = now.millisecondsSinceEpoch / 1000;
   }
+  if (amount == 0) return 0;
   if (end == null || amount == null) return 0;
   return amount / (end - start);
 }
