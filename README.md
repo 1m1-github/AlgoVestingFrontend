@@ -1,22 +1,17 @@
 # AlgoVestingFrontend
 
-## First force connect to wallet?
+frontend for https://github.com/1m1-github/AlgoVesting
+
+## Need to connect wallet first - any Algorand wallet with WalletConnect ~ e.g. Pera
 
 ## Create
-
-### create empty dApp
-
-### init dApp incl. coin sending
-inputs: cancancel, # coins, asa id, end, beneficiary
+give here
 
 ## Withdraw
-
-### opt-into dApp (optional, i.e. needed once)
-
-### opt-into ASA (optional, i.e. needed once)
-
-### withdraw
-inputs: sc 
+shows the smart contracts that were created for you
 
 ## Update
-inputs: end, # coins
+shows the smart contracts you created
+
+## Cancel
+under contruction
