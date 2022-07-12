@@ -3,6 +3,7 @@
 
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
@@ -63,10 +64,10 @@ enum bodyState { qr, empty, create, withdraw, update, cancel }
 class _MyHomePageState extends State<MyHomePage> {
   AlgorandNet net = AlgorandNet.testnet;
 
-  bodyState state = bodyState.create; // DEBUG
+  bodyState state = bodyState.withdraw; // DEBUG - def=empty
   Widget? QR;
 
-  SessionStatus? session = SessionStatus(chainId: 0, accounts: ['2I2IXTP67KSNJ5FQXHUJP5WZBX2JTFYEBVTBYFF3UUJ3SQKXSZ3QHZNNPY']);
+  SessionStatus? session = SessionStatus(chainId: 0, accounts: ['2I2IXTP67KSNJ5FQXHUJP5WZBX2JTFYEBVTBYFF3UUJ3SQKXSZ3QHZNNPY']); // DEBUG
   late List<int> assets;
 
   @override
@@ -96,8 +97,8 @@ class _MyHomePageState extends State<MyHomePage> {
         'https://firebasestorage.googleapis.com/v0/b/algovesting-1m1.appspot.com/o/AlgoVesting%20logo.png?alt=media&token=b07d9f01-56a3-4a69-9703-6e15b6713af2'
       ],
     ),
-  );
-  late AlgorandWalletConnectProvider provider = AlgorandWalletConnectProvider(connector);
+  ); // DEBUG
+  late AlgorandWalletConnectProvider provider = AlgorandWalletConnectProvider(connector); // DEBUG
 
   Future init() async {
     final bridge = await getWCBridge();
@@ -161,10 +162,10 @@ class _MyHomePageState extends State<MyHomePage> {
       case bodyState.qr:
         return QR!;
       case bodyState.empty:
-        return session == null ? const Text('first connect') : const Text('choose from menu');
+        return session == null ? ElevatedButton(onPressed: connect, child: Text('connect')) : const Text('choose from menu');
       case bodyState.create:
-        return Create(provider, net, session!, [92125658, 92125659]); // DEBUG
-      // return Create(provider, net, session!, assets);
+        // return Create(provider, net, session!, [92125658, 92125659]); // DEBUG
+        return Create(provider, net, session!, assets);
       case bodyState.withdraw:
         return Withdraw(provider, net, session!);
       case bodyState.update:
@@ -180,23 +181,26 @@ class _MyHomePageState extends State<MyHomePage> {
     print('build QR=$QR');
     return Scaffold(
       appBar: AppBar(
-        title: session == null ? ElevatedButton(onPressed: connect, child: const Text('connect')) : Text(session!.accounts.first),
+        title: Text('AlgoVesting'),
       ),
       bottomNavigationBar: BottomAppBar(
-          child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          ElevatedButton(style: style, onPressed: null, child: Text('mainnet (not yet)${net == AlgorandNet.mainnet ? ' - chosen' : ''}')),
-          ElevatedButton(
-              style: style,
-              onPressed: () {
-                setState(() {
-                  net = AlgorandNet.testnet;
-                });
-              },
-              child: Text('testnet${net == AlgorandNet.testnet ? ' - chosen' : ''}'))
-        ],
-      )),
+          child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, mainAxisSize: MainAxisSize.min, children: [
+        Text(session == null ? '' : session!.accounts.first),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            ElevatedButton(style: style, onPressed: null, child: Text('mainnet (not yet)${net == AlgorandNet.mainnet ? ' - chosen' : ''}')),
+            ElevatedButton(
+                style: style,
+                onPressed: () {
+                  setState(() {
+                    net = AlgorandNet.testnet;
+                  });
+                },
+                child: Text('testnet${net == AlgorandNet.testnet ? ' - chosen' : ''}'))
+          ],
+        )
+      ])),
       drawer: Drawer(
         child: ListView(
           children: [
@@ -315,24 +319,11 @@ class _CreateState extends State<Create> {
   SessionStatus session;
   List<int> assets;
 
-  // bool canCancel = false;
-  // bool done = false;
-  // late int asaId = assets.first;
-
-  // final TextEditingController _benController = TextEditingController();
-  // final TextEditingController _numController = TextEditingController();
-  // final TextEditingController _endController = TextEditingController();
-
   Future create(String beneficiary, int end, int asaId, int amount, bool cancancel) async {
     final lib = AlgorandLib.lib[net]!;
     final params = await lib.getSuggestedTransactionParams();
 
     final List<RawTransaction> txns = [];
-
-    // final cancancel = canCancel ? 1 : 0;
-    // final end = int.parse(_endController.text);
-    // final amount = int.parse(_numController.text);
-    // final ben = _benController.text;
 
     final userAddr = session.accounts.first;
 
@@ -350,7 +341,7 @@ class _CreateState extends State<Create> {
     final algoTxn = await (PaymentTransactionBuilder()
           ..sender = Address.fromAlgorandAddress(address: userAddr)
           ..receiver = Address.fromAlgorandAddress(address: CREATE_DAPP_ADDR[net]!)
-          ..amount = 741500
+          ..amount = 1000000
           ..suggestedParams = params)
         .build();
     txns.add(algoTxn);
@@ -391,7 +382,7 @@ class _CreateState extends State<Create> {
     final txnsBytes = txns.map((txn) => Encoder.encodeMessagePack(txn.toMessagePack())).toList();
     final signedTxnsBytes = await provider.signTransactions(txnsBytes);
 
-    sendTxn(lib, signedTxnsBytes, () {});
+    return sendTxn(lib, signedTxnsBytes, () {});
   }
 
   int amount = 0;
@@ -403,7 +394,9 @@ class _CreateState extends State<Create> {
   @override
   Widget build(BuildContext context) {
     return ItemCard(
-      beneficiaryOnChanged: (String x) {},
+      beneficiaryOnChanged: (String x) {
+        beneficiary = x;
+      },
       amountOnChanged: (String x) {
         amount = int.parse(x);
         setState(() {});
@@ -412,15 +405,12 @@ class _CreateState extends State<Create> {
         end = int.parse(x);
         setState(() {});
       },
-      asas: [1, 2], //assets,
+      asas: assets,
       onASAChanged: (int? x) {
-        print('onASAChanged x=$x asaId=$asaId');
         asaId = x;
-        print('onASAChanged x=$x asaId=$asaId');
         setState(() {});
       },
       canCancelOnChanged: (x) {
-        print('canCancelOnChanged x=$x');
         cancancel = x;
         setState(() {});
       },
@@ -431,53 +421,6 @@ class _CreateState extends State<Create> {
       onPressed: () => create(beneficiary, end, asaId!, amount, cancancel),
       action: 'create',
     );
-
-    // return Container(
-    //   child: Column(children: [
-    //     Checkbox(
-    //       value: canCancel,
-    //       onChanged: (bool? value) {
-    //         setState(() {
-    //           canCancel = value!;
-    //         });
-    //       },
-    //     ),
-    //     DropdownButton<int>(
-    //       items: assets.map((int e) => DropdownMenuItem<int>(child: Text(e.toString()), value: e)).toList(),
-    //       onChanged: (int? value) {
-    //         setState(() {
-    //           asaId = value!;
-    //         });
-    //       },
-    //       value: asaId,
-    //     ),
-    //     TextField(
-    //       controller: _numController,
-    //       keyboardType: TextInputType.number,
-    //       decoration: InputDecoration(label: const Text('Quantity')),
-    //       onChanged: (_) {
-    //         calcRate();
-    //         setState(() {});
-    //       },
-    //     ),
-    //     TextField(
-    //       controller: _endController,
-    //       keyboardType: TextInputType.number,
-    //       decoration: InputDecoration(label: const Text('END epoch timestamp')),
-    //       onChanged: (_) {
-    //         calcRate();
-    //         setState(() {});
-    //       },
-    //     ),
-    //     Text('$rate [$asaId / sec]'),
-    //     TextField(
-    //       controller: _benController,
-    //       decoration: InputDecoration(label: const Text('Beneficiary')),
-    //     ),
-    //     ElevatedButton(onPressed: create, child: Text('create dApp')),
-    //     done ? Text('DONE') : Container(),
-    //   ]),
-    // );
   }
 }
 
@@ -500,7 +443,8 @@ class _WithdrawState extends State<Withdraw> {
 
   bool done = false;
 
-  List<Transaction>? txns;
+  // List<Transaction>? txns;
+  List? txns;
 
   @override
   void initState() {
@@ -509,7 +453,7 @@ class _WithdrawState extends State<Withdraw> {
   }
 
   void init() async {
-    txns = await findTxns(net, '$NOTE_PREFIX_FOR${session.accounts.first}', CREATE_DAPP_ADDR[net]!);
+    txns = [1, 2, 3, 4]; //await findTxns(net, '$NOTE_PREFIX_FOR${session.accounts.first}', CREATE_DAPP_ADDR[net]!);
     setState(() {});
   }
 
@@ -553,13 +497,11 @@ class _WithdrawState extends State<Withdraw> {
 
     AtomicTransfer.group(txns);
     final txnsBytes = txns.map((txn) => Encoder.encodeMessagePack(txn.toMessagePack())).toList();
+    print('withdraw - signTransactions');
     final signedTxnsBytes = await provider.signTransactions(txnsBytes);
 
-    sendTxn(lib, signedTxnsBytes, () {
-      setState(() {
-        done = true;
-      });
-    });
+    print('withdraw - sendTxn');
+    return sendTxn(lib, signedTxnsBytes, () {});
   }
 
   Future<bool> isOptedIs(String addr, int asaId) async {
@@ -568,9 +510,12 @@ class _WithdrawState extends State<Withdraw> {
     return accInfo.assets.map((e) => e.assetId).contains(asaId);
   }
 
-  Widget txnTile(Transaction t) {
-    final dAppId = t.innerTxns[2].applicationTransaction!.applicationId;
-    final dAppAddr = Address.forApplication(dAppId).encodedAddress;
+  Widget txnTile(t) {
+    // Widget txnTile(Transaction t) {
+    final dAppId = 92125658; //t.innerTxns[2].applicationTransaction!.applicationId;
+    final dAppAddr = 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //Address.forApplication(dAppId).encodedAddress;
+
+    final creator = 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //t.innerTxns[2].note!.split(' ').toList()[2];
 
     return FutureBuilder(
       builder: (context, snapshot) {
@@ -579,20 +524,18 @@ class _WithdrawState extends State<Withdraw> {
             title: Text('loading...'),
           );
         }
-        final data = snapshot.data as List;
-        final amount = data[0];
-        final asaId = data[1];
-        final start = data[2];
-        final end = data[3];
+        // final data = snapshot.data as List;
+        final amount = 7000; //data[0];
+        final asaId = 92125658; //data[1];
+        final start = 1657580600; //data[2];
+        final end = 1657580600; //data[3];
 
         return ItemCard(
           topTitleKey: 'dApp',
           topTitleValue: dAppAddr,
           topSubTitleKey: 'creator',
-          topSubTitleValue: 'note?',
-          // amountController: _amountController,
+          topSubTitleValue: creator,
           amountOnChanged: null,
-          // endController: _endController,
           endOnChanged: null,
           asas: null,
           onASAChanged: null,
@@ -606,7 +549,7 @@ class _WithdrawState extends State<Withdraw> {
           action: 'withdraw',
         );
       },
-      future: txnFutureInfo(net, dAppId, dAppAddr),
+      future: Future.value(0), //txnFutureInfo(net, dAppId, dAppAddr),
     );
   }
 
@@ -617,8 +560,12 @@ class _WithdrawState extends State<Withdraw> {
             ? const Text('searching')
             : txns!.isEmpty
                 ? const Text('your account is not the beneficiary of any AlgoVesting dApps')
-                : ListView(
-                    children: txns!.map(txnTile).toList(),
+                : ListView.separated(
+                    itemCount: txns!.length,
+                    separatorBuilder: (_, __) => SizedBox(height: 25),
+                    itemBuilder: (_, ix) => txnTile(txns![ix]),
+                    // padding: EdgeInsets.only(bottom: 50, top: 50),
+                    // children: txns!.map(txnTile).toList(),
                   ));
   }
 }
@@ -711,7 +658,7 @@ class _UpdateState extends State<Update> {
         final start = data[2];
         final end = data[3];
 
-        final rate = calcRate(start, end, amount) ?? 0;
+        final rate = calcRate(start, end, amount);
 
         int newAmount = 0;
         int newEnd = 0;
@@ -736,7 +683,7 @@ class _UpdateState extends State<Update> {
           start: start,
           end: end,
           onPressed: () {
-            final newRate = calcRate(start, newEnd, amount + newAmount) ?? 0;
+            final newRate = calcRate(start, newEnd, amount + newAmount);
             if (newRate < rate) return null;
             return update(dAppAddr, dAppId, asaId, newEnd, newAmount);
           },
@@ -895,6 +842,8 @@ class ItemCard extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
+  final small = true; //false;
+
   final String? topTitleKey;
   final String? topTitleValue;
   final String? topSubTitleKey;
@@ -926,18 +875,35 @@ class ItemCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          ElevatedButton(
-            onPressed: onPressed,
-            child: Text(
-              action,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 30),
-            ),
-          ),
+          Container(
+              alignment: AlignmentDirectional.bottomEnd,
+              height: 50,
+              child: (ElevatedButton(
+                onPressed: onPressed,
+                child: Text(
+                  action,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: small ? 15 : 30),
+                ),
+              ))),
           (topTitleKey != null || topTitleValue != null || topSubTitleKey != null || topSubTitleValue != null)
               ? ListTile(
-                  title: Text('$topTitleKey $topTitleValue'),
-                  subtitle: Text('$topSubTitleKey $topSubTitleValue'),
+                  title: RichText(
+                      text: TextSpan(text: '$topTitleKey ', style: TextStyle(fontWeight: FontWeight.bold), children: [
+                    TextSpan(
+                        style: TextStyle(fontWeight: FontWeight.normal),
+                        text: topTitleValue,
+                        recognizer: TapGestureRecognizer()..onTap = () => copy(context, topTitleValue)),
+                    TextSpan(text: ' (canCancel ${canCancel ? 'true' : 'false'})', style: TextStyle(fontWeight: FontWeight.normal)),
+                  ])),
+                  // subtitle: Text('$topSubTitleKey $topSubTitleValue'),
+                  subtitle: RichText(
+                      text: TextSpan(text: '$topSubTitleKey ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey), children: [
+                    TextSpan(
+                        style: TextStyle(fontWeight: FontWeight.normal),
+                        text: topTitleValue,
+                        recognizer: TapGestureRecognizer()..onTap = () => copy(context, topTitleValue))
+                  ])),
                 )
               : Container(),
           amountOnChanged != null
@@ -972,10 +938,7 @@ class ItemCard extends StatelessWidget {
                 )
               : Container(),
           canCancelOnChanged != null
-              ?
-              // ? Row(children: [
-              CheckboxListTile(
-                  // tileColor: Colors.grey,
+              ? CheckboxListTile(
                   subtitle: Text('can the creator ever remove the coins?'),
                   controlAffinity: ListTileControlAffinity.leading,
                   shape: RoundedRectangleBorder(
@@ -983,33 +946,23 @@ class ItemCard extends StatelessWidget {
                     side: BorderSide(width: 1, color: Colors.grey),
                   ),
                   side: BorderSide(width: 1),
-                  // checkboxShape: OutlinedBorder(side: BorderSide.),
                   contentPadding: EdgeInsets.symmetric(horizontal: 0),
                   title: const Text('CanCancel'),
                   value: canCancel,
                   onChanged: (x) => canCancelOnChanged!(x!),
                 )
-              // ])
               : Container(),
           asas != null
               ? Row(children: [
-                  // const Text('ASA'),
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(color: Colors.grey, style: BorderStyle.solid, width: 0.80),
                     ),
                     child: DropdownButton<int>(
-                      // borderRadius: BorderRadius.circular(2),
-                      // elevation: 10,
-                      // dropdownColor: Colors.grey,
                       hint: Text('which coin to lock? [ASA id]'),
                       icon: Icon(Icons.keyboard_arrow_down),
                       alignment: AlignmentDirectional.center,
-                      // iconSize: 100,
-                      // style: TextStyle(leadingDistribution: TextLeadingDistribution.even, ),
-                      // side
-                      // disabledHint: null,
                       items: asas!
                           .map((int e) => DropdownMenuItem<int>(
                               alignment: AlignmentDirectional.center,
@@ -1028,12 +981,17 @@ class ItemCard extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(10),
             decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(5),
               color: Colors.grey,
             ),
-            child: Text(
-              '$amount locked until $end\nwithdrawal rate = ${calcRate(start, end, amount).toStringAsPrecision(2)} [$asaId/sec]',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20),
+            child: RichText(
+              text: TextSpan(style: TextStyle(fontSize: small ? 13 : 20), text: '$amount locked until ', children: [
+                TextSpan(text: end.toString(), recognizer: TapGestureRecognizer()..onTap = () => copy(context, end)),
+                TextSpan(text: '\nwithdrawal rate = ${calcRate(start, end, amount).toStringAsPrecision(2)} ['),
+                TextSpan(text: asaId.toString(), recognizer: TapGestureRecognizer()..onTap = () => copy(context, asaId)),
+                TextSpan(text: '/sec]'),
+              ]),
+              // textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -1093,7 +1051,8 @@ Future<List> txnFutureInfo(AlgorandNet net, int appId, String appAddr) async {
   return [amount, asaId, start, end];
 }
 
-void sendTxn(lib, List<Uint8List> signedTxnsBytes, Function doneF) async {
+Future sendTxn(Algorand lib, List<Uint8List> signedTxnsBytes, Function doneF) async {
+  print('sendTxn');
   try {
     final txId = await lib.sendRawTransactions(signedTxnsBytes);
     print('txId = $txId');
@@ -1102,11 +1061,19 @@ void sendTxn(lib, List<Uint8List> signedTxnsBytes, Function doneF) async {
 
     print('pendingTxn=${pendingTxn}');
 
-    doneF();
+    return doneF();
   } on AlgorandException catch (ex) {
     final cause = ex.cause;
     if (cause is dio.DioError) {
       print('AlgorandException ' + cause.response?.data['message']);
     }
   }
+}
+
+void copy(context, x) {
+  Clipboard.setData(ClipboardData(text: x.toString()));
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: const Text('copied'),
+    duration: Duration(milliseconds: 500),
+  ));
 }
