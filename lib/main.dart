@@ -1,5 +1,8 @@
+// flutter build web && firebase deploy
 // flutter run -d chrome
 // flutter build web
+// firebase deploy
+// firebase login
 
 import 'dart:math';
 import 'dart:typed_data';
@@ -25,6 +28,7 @@ const NOTE_PREFIX_BY = 'AlgoVesting$VERSION by ';
 const MIN_ROUND = 22715559;
 final String START_KEY = stringToBase64.encode('START');
 final String END_KEY = stringToBase64.encode('END');
+final String CANCANCEL_KEY = stringToBase64.encode('CANCANCEL');
 const Map<AlgorandNet, int> CREATE_DAPP_ID = {
   AlgorandNet.mainnet: -1,
   AlgorandNet.testnet: 99099422,
@@ -64,10 +68,10 @@ enum bodyState { qr, empty, create, withdraw, update, cancel }
 class _MyHomePageState extends State<MyHomePage> {
   AlgorandNet net = AlgorandNet.testnet;
 
-  bodyState state = bodyState.withdraw; // DEBUG - def=empty
+  bodyState state = bodyState.empty; // DEBUG - def=empty
   Widget? QR;
 
-  SessionStatus? session = SessionStatus(chainId: 0, accounts: ['2I2IXTP67KSNJ5FQXHUJP5WZBX2JTFYEBVTBYFF3UUJ3SQKXSZ3QHZNNPY']); // DEBUG
+  SessionStatus? session; // = SessionStatus(chainId: 0, accounts: ['2I2IXTP67KSNJ5FQXHUJP5WZBX2JTFYEBVTBYFF3UUJ3SQKXSZ3QHZNNPY']); // DEBUG
   late List<int> assets;
 
   @override
@@ -85,20 +89,21 @@ class _MyHomePageState extends State<MyHomePage> {
     return bridges[ix];
   }
 
-  late WalletConnect connector = WalletConnect(
-    // bridge: 'https://bridge.walletconnect.org',
-    bridge: 'https://wallet-connect-a.perawallet.app',
-    // bridge: bridge,
-    clientMeta: const PeerMeta(
-      name: 'AlgoVesting',
-      description: 'pro-rata coins',
-      url: 'https://github.com/1m1-github/AlgoVesting',
-      icons: [
-        'https://firebasestorage.googleapis.com/v0/b/algovesting-1m1.appspot.com/o/AlgoVesting%20logo.png?alt=media&token=b07d9f01-56a3-4a69-9703-6e15b6713af2'
-      ],
-    ),
-  ); // DEBUG
-  late AlgorandWalletConnectProvider provider = AlgorandWalletConnectProvider(connector); // DEBUG
+  late WalletConnect connector;
+  //  = WalletConnect(
+  //   // bridge: 'https://bridge.walletconnect.org',
+  //   bridge: 'https://wallet-connect-a.perawallet.app',
+  //   // bridge: bridge,
+  //   clientMeta: const PeerMeta(
+  //     name: 'AlgoVesting',
+  //     description: 'pro-rata coins',
+  //     url: 'https://github.com/1m1-github/AlgoVesting',
+  //     icons: [
+  //       'https://firebasestorage.googleapis.com/v0/b/algovesting-1m1.appspot.com/o/AlgoVesting%20logo.png?alt=media&token=b07d9f01-56a3-4a69-9703-6e15b6713af2'
+  //     ],
+  //   ),
+  // ); // DEBUG
+  late AlgorandWalletConnectProvider provider; // = AlgorandWalletConnectProvider(connector); // DEBUG
 
   Future init() async {
     final bridge = await getWCBridge();
@@ -169,9 +174,11 @@ class _MyHomePageState extends State<MyHomePage> {
       case bodyState.withdraw:
         return Withdraw(provider, net, session!);
       case bodyState.update:
-        return const Text('TODO');
+        // return UnderConstruction();
+        return Update(provider, net, session!);
       case bodyState.cancel:
-        return const Text('TODO');
+        return UnderConstruction();
+        ;
     }
   }
 
@@ -227,7 +234,7 @@ class _MyHomePageState extends State<MyHomePage> {
               },
             ),
             ListTile(
-              title: const Text('update'),
+              title: const Text('update ~ UnderConstruction'),
               onTap: () {
                 if (session != null) {
                   setState(() {
@@ -238,7 +245,7 @@ class _MyHomePageState extends State<MyHomePage> {
               },
             ),
             ListTile(
-              title: const Text('cancel'),
+              title: const Text('cancel ~ UnderConstruction'),
               onTap: () {
                 if (session != null) {
                   setState(() {
@@ -453,7 +460,7 @@ class _WithdrawState extends State<Withdraw> {
   }
 
   void init() async {
-    txns = [1, 2, 3, 4]; //await findTxns(net, '$NOTE_PREFIX_FOR${session.accounts.first}', CREATE_DAPP_ADDR[net]!);
+    txns = await findTxns(net, '$NOTE_PREFIX_FOR${session.accounts.first}', CREATE_DAPP_ADDR[net]!); // [1, 2, 3, 4]; //
     setState(() {});
   }
 
@@ -512,10 +519,10 @@ class _WithdrawState extends State<Withdraw> {
 
   Widget txnTile(t) {
     // Widget txnTile(Transaction t) {
-    final dAppId = 92125658; //t.innerTxns[2].applicationTransaction!.applicationId;
-    final dAppAddr = 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //Address.forApplication(dAppId).encodedAddress;
+    final dAppId = t.innerTxns[2].applicationTransaction!.applicationId; // 92125658; //
+    final dAppAddr = Address.forApplication(dAppId).encodedAddress; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
 
-    final creator = 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //t.innerTxns[2].note!.split(' ').toList()[2];
+    final creator = t.innerTxns[2].note!.split(' ').toList()[2]; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA';
 
     return FutureBuilder(
       builder: (context, snapshot) {
@@ -524,11 +531,11 @@ class _WithdrawState extends State<Withdraw> {
             title: Text('loading...'),
           );
         }
-        // final data = snapshot.data as List;
-        final amount = 7000; //data[0];
-        final asaId = 92125658; //data[1];
-        final start = 1657580600; //data[2];
-        final end = 1657580600; //data[3];
+        final data = snapshot.data as List;
+        final amount = data[0]; // 7000; //
+        final asaId = data[1]; // 92125658; //
+        final start = data[2]; // 1657580600; //
+        final end = data[3]; // 1657580600; //
 
         return ItemCard(
           topTitleKey: 'dApp',
@@ -607,8 +614,6 @@ class _UpdateState extends State<Update> {
     final List<RawTransaction> txns = [];
 
     final userAddr = session.accounts.first;
-    // final end = int.parse(_endController.text);
-    // final amount = int.parse(_amountController.text);
 
     final arguments = 'str:update,int:$end'.toApplicationArguments();
     final callTxn = await (ApplicationCallTransactionBuilder()
@@ -633,17 +638,16 @@ class _UpdateState extends State<Update> {
     final txnsBytes = txns.map((txn) => Encoder.encodeMessagePack(txn.toMessagePack())).toList();
     final signedTxnsBytes = await provider.signTransactions(txnsBytes);
 
-    sendTxn(lib, signedTxnsBytes, () {});
+    return sendTxn(lib, signedTxnsBytes, () {});
   }
 
   Widget txnTile(Transaction t) {
-    final dAppId = t.innerTxns[2].applicationTransaction!.applicationId;
-    final dAppAddr = Address.forApplication(dAppId).encodedAddress;
+    final dAppId = t.innerTxns[2].applicationTransaction!.applicationId; // 92125658; //
+    final dAppAddr = Address.forApplication(dAppId).encodedAddress; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
 
-    final note = t.innerTxns[2].note ?? '';
-
-    // final TextEditingController _amountController = TextEditingController();
-    // final TextEditingController _endController = TextEditingController();
+    final base64Note = t.innerTxns[2].note!;
+    final clearTextNote = stringToBase64.decode(base64Note);
+    final beneficiary = clearTextNote.split(' ').toList()[2]; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
 
     return FutureBuilder(
       builder: (context, snapshot) {
@@ -653,10 +657,11 @@ class _UpdateState extends State<Update> {
           );
         }
         final data = snapshot.data as List;
-        final amount = data[0];
-        final asaId = data[1];
-        final start = data[2];
-        final end = data[3];
+        final amount = data[0]; // 7000; //
+        final asaId = data[1]; // 92125658; //
+        final start = data[2]; // 1657580600; //
+        final end = data[3]; // 1657580600; //
+        final canCancel = data[4] == 0 ? false : true; // 1; //
 
         final rate = calcRate(start, end, amount);
 
@@ -667,17 +672,16 @@ class _UpdateState extends State<Update> {
           topTitleKey: 'dApp',
           topTitleValue: dAppAddr,
           topSubTitleKey: 'beneficiary',
-          topSubTitleValue: note,
-          // amountController: _amountController,
+          topSubTitleValue: beneficiary,
           amountOnChanged: (String x) {
             newAmount = int.parse(x);
           },
-          // endController: _endController,
           endOnChanged: (String x) {
             newEnd = int.parse(x);
           },
           asas: null,
           onASAChanged: null,
+          canCancel: canCancel,
           asaId: asaId,
           amount: amount,
           start: start,
@@ -1002,7 +1006,7 @@ class ItemCard extends StatelessWidget {
 
 ////////////
 /// functions
-///
+///`
 
 Future<List<Transaction>> findTxns(AlgorandNet net, String prefix, String addr) async {
   final lib = AlgorandLib.lib[net]!;
@@ -1025,6 +1029,7 @@ num calcRate(int? _start, int? end, int? amount) {
   }
   if (amount == 0) return 0;
   if (end == null || amount == null) return 0;
+  if (start <= end) return amount;
   return amount / (end - start);
 }
 
@@ -1043,12 +1048,14 @@ Future<List> txnFutureInfo(AlgorandNet net, int appId, String appAddr) async {
   final application = applicationSearchResponse.applications.first;
   int? end;
   int? start;
+  int? canCancel;
   for (TealKeyValue kv in application.params.globalState) {
     if (kv.key == END_KEY) end = kv.value.uint;
     if (kv.key == START_KEY) start = kv.value.uint;
+    if (kv.key == CANCANCEL_KEY) canCancel = kv.value.uint;
   }
 
-  return [amount, asaId, start, end];
+  return [amount, asaId, start, end, canCancel];
 }
 
 Future sendTxn(Algorand lib, List<Uint8List> signedTxnsBytes, Function doneF) async {
@@ -1076,4 +1083,13 @@ void copy(context, x) {
     content: const Text('copied'),
     duration: Duration(milliseconds: 500),
   ));
+}
+
+class UnderConstruction extends StatelessWidget {
+  const UnderConstruction({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(child: Text('UnderConstruction', style: TextStyle(fontSize: 30)));
+  }
 }
