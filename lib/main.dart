@@ -522,7 +522,8 @@ class _WithdrawState extends State<Withdraw> {
     final dAppId = t.innerTxns[2].applicationTransaction!.applicationId; // 92125658; //
     final dAppAddr = Address.forApplication(dAppId).encodedAddress; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
 
-    final creator = t.innerTxns[2].note!.split(' ').toList()[2]; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA';
+    final base64Note = t.innerTxns[2].note!;
+    final creator = noteToFirstClearTextToken(base64Note);
 
     return FutureBuilder(
       builder: (context, snapshot) {
@@ -556,7 +557,7 @@ class _WithdrawState extends State<Withdraw> {
           action: 'withdraw',
         );
       },
-      future: Future.value(0), //txnFutureInfo(net, dAppId, dAppAddr),
+      future: txnFutureInfo(net, dAppId, dAppAddr), // Future.value(0), // // DEBUG
     );
   }
 
@@ -646,8 +647,7 @@ class _UpdateState extends State<Update> {
     final dAppAddr = Address.forApplication(dAppId).encodedAddress; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
 
     final base64Note = t.innerTxns[2].note!;
-    final clearTextNote = stringToBase64.decode(base64Note);
-    final beneficiary = clearTextNote.split(' ').toList()[2]; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
+    final beneficiary = noteToFirstClearTextToken(base64Note);
 
     return FutureBuilder(
       builder: (context, snapshot) {
@@ -905,7 +905,7 @@ class ItemCard extends StatelessWidget {
                       text: TextSpan(text: '$topSubTitleKey ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey), children: [
                     TextSpan(
                         style: TextStyle(fontWeight: FontWeight.normal),
-                        text: topTitleValue,
+                        text: topSubTitleValue,
                         recognizer: TapGestureRecognizer()..onTap = () => copy(context, topTitleValue))
                   ])),
                 )
@@ -1029,7 +1029,7 @@ num calcRate(int? _start, int? end, int? amount) {
   }
   if (amount == 0) return 0;
   if (end == null || amount == null) return 0;
-  if (start <= end) return amount;
+  if (end <= start) return amount;
   return amount / (end - start);
 }
 
@@ -1092,4 +1092,9 @@ class UnderConstruction extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(child: Text('UnderConstruction', style: TextStyle(fontSize: 30)));
   }
+}
+
+String noteToFirstClearTextToken(String base64Note) {
+  final clearTextNote = stringToBase64.decode(base64Note);
+  return clearTextNote.split(' ').toList()[2]; // 'FLQLJZ5ZJVAY6VYO2AGSPVTFPCOUAASNMUBTR37RGSU7HVYDPC77LYYLKA'; //
 }
